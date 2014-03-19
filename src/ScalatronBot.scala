@@ -1,79 +1,3 @@
-/*class ControlFunctionFactory {
-  def create = new ControlFunction().respond _
-}
-
-class ControlFunction {
-  def respond(input: String) = {
-    val state = parse(input)
-    var a = 0
-    "Status(text=Hello)"
-    //println(state.sayGeneration)
-    //val resp = "Status(text=" + state.sayGeneration.toString + ")"
-    //var resp = "Status(text=Hello)"
-    //println(resp)
-
-    //val tokens = input.split("(");
-    //"Say(text=" + tokens.toString() + ")"
-  }
-
-  def parse(input: String) = {
-    val tokens = input.split("\\(");
-    var generation = 0
-    var name = ""
-    var time = 0
-    var view = ""
-    var energy = ""
-    var master = Array(0, 0)
-    var collision = Array(0, 0)
-    var slaves = 0
-    if (tokens(0).startsWith("React")) {
-      //println(strippedInputJustStart)
-      val strippedInput = tokens(1).split("\\(")(0)
-      val strippedTokens = strippedInput.split(",")
-      generation = searchInKV("generation", strippedTokens).toInt
-      println(generation.toString)
-      //      for (token <- strippedTokens) {
-      //        val tokenName = token.split("=")(0)
-      //        val tokenVal = token.split("=")(1)
-      //        tokenName match {
-      //          case "generation" =>
-      //            generation = tokenVal.toInt
-      //          case "name" =>
-      //            name = tokenVal
-      //          case "time" =>
-      //            time = tokenVal.toInt
-      //          case "view" =>
-      //            view = tokenVal
-      //          case "energy" =>
-      //            energy = tokenVal
-      //          case "master" =>
-      //            -master = tokenVal.split(":").map(x => x.toInt)
-      //          case "collision" =>
-      //            collision = tokenVal.split(":").map(x => x.toInt)
-      //          case "slaves" =>
-      //            slaves = tokenVal.toInt
-      //        }
-      //    }
-    }
-    val result = new State(generation, name, time, view, energy, master,
-      collision, slaves)
-    result
-  }
-
-  def searchInKV(key: String, KV: Array[String]) = {
-    var keys = KV.filter(k => k.startsWith(key))
-    var foundKey = if (keys.length > 0) keys(0).split("=")(1) else "0"
-    foundKey
-  }
-}
-
-class State(generation: Int, name: String, time: Int, view: String, energy: String,
-  master: Array[Int], collision: Array[Int], slaves: Int) {
-  def sayGeneration = generation
-}
-
-*/
-
 // Example Bot #1: The Reference Bot
 
 /**
@@ -91,48 +15,60 @@ class State(generation: Int, name: String, time: Int, view: String, energy: Stri
  *  - target = remaining offset to target location
  */
 object ControlFunction {
-  def respond(input: String) = {
-    "Status(text=Hello)"
-  }
 
   def forMaster(bot: Bot) {
     // demo: log the view of the master bot into the debug output (if running in the browser sandbox)
-    bot.log(bot.view.cells.grouped(31).mkString("\n"))
+    //    bot.log(bot.view.cells.grouped(31).mkString("\n"))
+    //
+    //    val (directionValue, nearestEnemyMaster, nearestEnemySlave) = analyzeViewAsMaster(bot.view)
+    //
+    //    val dontFireAggressiveMissileUntil = bot.inputAsIntOrElse("dontFireAggressiveMissileUntil", -1)
+    //    val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
+    //    val lastDirection = bot.inputAsIntOrElse("lastDirection", 0)
+    //
+    //    // determine movement direction
+    //    directionValue(lastDirection) += 10 // try to break ties by favoring the last direction
+    //    val bestDirection45 = directionValue.zipWithIndex.maxBy(_._1)._2
+    //    val direction = XY.fromDirection45(bestDirection45)
+    //    bot.move(direction)
+    //    bot.set("lastDirection" -> bestDirection45)
+    //
+    //    if (dontFireAggressiveMissileUntil < bot.time && bot.energy > 100) { // fire attack missile?
+    //      nearestEnemyMaster match {
+    //        case None => // no-on nearby
+    //        case Some(relPos) => // a master is nearby
+    //          val unitDelta = relPos.signum
+    //          val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
+    //          bot.spawn(unitDelta, "mood" -> "Aggressive", "target" -> remainder)
+    //          bot.set("dontFireAggressiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
+    //      }
+    //    } else if (dontFireDefensiveMissileUntil < bot.time && bot.energy > 100) { // fire defensive missile?
+    //      nearestEnemySlave match {
+    //        case None => // no-on nearby
+    //        case Some(relPos) => // an enemy slave is nearby
+    //          if (relPos.stepCount < 8) {
+    //            // this one's getting too close!
+    //            val unitDelta = relPos.signum
+    //            val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
+    //            bot.spawn(unitDelta, "mood" -> "Defensive", "target" -> remainder)
+    //            bot.set("dontFireDefensiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
+    //          }
+    //      }
+    //    }
+    var availablePositions = Array(-1, 0, 1)
+    //converts (-1, 0, 1) to ((-1, -1), (-1, 0), (-1, 1), (0, -1) ... )
+    var availableDirections = availablePositions.foldLeft(List[List[Int]]())((b, a) => b.union(availablePositions.foldLeft(List[List[Int]]())((d, c) => d :+ List(a, c))))
+    println(availableDirections.toString)
+    bot.move(new XY(1, 1))
+  }
 
-    val (directionValue, nearestEnemyMaster, nearestEnemySlave) = analyzeViewAsMaster(bot.view)
-
-    val dontFireAggressiveMissileUntil = bot.inputAsIntOrElse("dontFireAggressiveMissileUntil", -1)
-    val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
-    val lastDirection = bot.inputAsIntOrElse("lastDirection", 0)
-
-    // determine movement direction
-    directionValue(lastDirection) += 10 // try to break ties by favoring the last direction
-    val bestDirection45 = directionValue.zipWithIndex.maxBy(_._1)._2
-    val direction = XY.fromDirection45(bestDirection45)
-    bot.move(direction)
-    bot.set("lastDirection" -> bestDirection45)
-
-    if (dontFireAggressiveMissileUntil < bot.time && bot.energy > 100) { // fire attack missile?
-      nearestEnemyMaster match {
-        case None => // no-on nearby
-        case Some(relPos) => // a master is nearby
-          val unitDelta = relPos.signum
-          val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
-          bot.spawn(unitDelta, "mood" -> "Aggressive", "target" -> remainder)
-          bot.set("dontFireAggressiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
-      }
-    } else if (dontFireDefensiveMissileUntil < bot.time && bot.energy > 100) { // fire defensive missile?
-      nearestEnemySlave match {
-        case None => // no-on nearby
-        case Some(relPos) => // an enemy slave is nearby
-          if (relPos.stepCount < 8) {
-            // this one's getting too close!
-            val unitDelta = relPos.signum
-            val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
-            bot.spawn(unitDelta, "mood" -> "Defensive", "target" -> remainder)
-            bot.set("dontFireDefensiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
-          }
-      }
+  def noWallDirection(view: View) = {
+    val directionValue = Array.fill(8)(1000) //1000 is infinity
+    for ((cell, index) <- view.cells.zipWithIndex) {
+    	cell match{
+    	  case 'W' => 
+    	    val relativePos = view relPosFromIndex(index)
+    	}
     }
   }
 
