@@ -14,6 +14,21 @@
  *  - mood = Aggressive | Defensive | Lurking
  *  - target = remaining offset to target location
  */
+object Items {
+  val wall = 'W'
+  val zugar = 'P'
+  val toxifera = 'p'
+}
+
+case class Choice(direction: XY) {
+  def dangerous = {
+    closestToxifera < 2 || closestWall < 2
+  }
+  var closestWall = 1000.0
+  var closestZugar = 1000.0
+  var closestToxifera = 1000.0
+}
+
 object ControlFunction {
 
   def forMaster(bot: Bot) {
@@ -57,18 +72,81 @@ object ControlFunction {
     //    }
     var availablePositions = Array(-1, 0, 1)
     //converts (-1, 0, 1) to ((-1, -1), (-1, 0), (-1, 1), (0, -1) ... )
-    var availableDirections = availablePositions.foldLeft(List[List[Int]]())((b, a) => b.union(availablePositions.foldLeft(List[List[Int]]())((d, c) => d :+ List(a, c))))
-    println(availableDirections.toString)
-    bot.move(new XY(1, 1))
+    /*var availableDirections = availablePositions.foldLeft(List[List[Int]]())((b, a) => b.union(availablePositions.foldLeft(List[List[Int]]())((d, c) =>
+      a match {
+        // omit (0, 0)
+        case 0 =>
+          c match {
+            case 0 => d
+            case _ => d :+ List(a, c)
+          }
+        case _ => d :+ List(a, c)
+      })))*/
+    var availableDirections = (List[List[Int]]() /: availablePositions)((b, a) => b.union((List[List[Int]]() /: availablePositions)((d, c) =>
+      a match {
+        // omit (0, 0)
+        case 0 =>
+          c match {
+            case 0 => d
+            case _ => d :+ List(a, c)
+          }
+        case _ => d :+ List(a, c)
+      })))
+    var choices = (List[Choice]() /: availableDirections)((b, a) => b :+ Choice(XY(a(0), a(1))))
+    val distances = find(bot.view, Items.wall)
+    val distancesZugar = find(bot.view, Items.zugar)
+    val nearestZugar = distancesZugar.min
+    val distancesToxifera = find(bot.view, Items.toxifera)
+
+    
+    var allDistances = (distances, distancesZugar, distancesToxifera).zipped.toList
+    for ((choice, index) <- choices.zipWithIndex){
+      choice.closestToxifera = distancesToxifera(index)
+      choice.closestWall = distances(index)
+      choice.closestZugar = distancesZugar(index)
+    }
+    var nonDangerousDirections = choices.filter(choice => !choice.dangerous)
+    var movingDirection = Choice(XY(0,0))
+    if (nonDangerousDirections.size > 0){
+      movingDirection = nonDangerousDirections.minBy[Double](x => x.closestZugar)
+    }
+    //var movingDirection = List[Int](0, 0)
+    bot move (movingDirection.direction)
   }
 
-  def noWallDirection(view: View) = {
-    val directionValue = Array.fill(8)(1000) //1000 is infinity
+  def find(view: View, item: Char) = {
+    var directionValue = Array.fill(8)(1000.0) //1000 is infinity
     for ((cell, index) <- view.cells.zipWithIndex) {
-    	cell match{
-    	  case 'W' => 
-    	    val relativePos = view relPosFromIndex(index)
-    	}
+      cell match {
+        case `item` =>
+          directionValue = updateDirectionValue(view, directionValue, index)
+        case default =>
+      }
+    }
+    directionValue
+  }
+
+  def updateDirectionValue(view: View, directionValue: Array[Double], index: Int) = {
+    val relativePos = view relPosFromIndex (index)
+    val direction = relativePos.toDirection45
+    val i = getIndexFromPosition(direction)
+    val distance = relativePos.length
+    if (distance < directionValue(i)) {
+      directionValue(i) = distance
+    }
+    directionValue
+  }
+
+  def getIndexFromPosition(direction: Int) = {
+    direction match {
+      case Direction45.Down => 4
+      case Direction45.DownRight => 7
+      case Direction45.Left => 1
+      case Direction45.LeftDown => 2
+      case Direction45.Right => 6
+      case Direction45.RightUp => 5
+      case Direction45.Up => 3
+      case Direction45.UpLeft => 0
     }
   }
 
