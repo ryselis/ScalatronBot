@@ -14,74 +14,37 @@
  *  - mood = Aggressive | Defensive | Lurking
  *  - target = remaining offset to target location
  */
+import scala.util.Random
+
 object Items {
   val wall = 'W'
   val zugar = 'P'
   val toxifera = 'p'
+  val fluppet = 'B'
+  val snorg = 'b'
+  val miniBot = 'S'
 }
 
 case class Choice(direction: XY) {
   def dangerous = {
-    closestToxifera < 2 || closestWall < 2
+    closestToxifera < 2 || closestWall < 2 || closestSnorg < 3
+  }
+  def betterNotGoHereMiniBot = {
+    dangerous || closestMiniBot < 2
   }
   var closestWall = 1000.0
   var closestZugar = 1000.0
   var closestToxifera = 1000.0
+  var closestFluppet = 1000.0
+  var closestSnorg = 1000.0
+  var closestMiniBot = 1000.0
 }
 
 object ControlFunction {
 
-  def forMaster(bot: Bot) {
-    // demo: log the view of the master bot into the debug output (if running in the browser sandbox)
-    //    bot.log(bot.view.cells.grouped(31).mkString("\n"))
-    //
-    //    val (directionValue, nearestEnemyMaster, nearestEnemySlave) = analyzeViewAsMaster(bot.view)
-    //
-    //    val dontFireAggressiveMissileUntil = bot.inputAsIntOrElse("dontFireAggressiveMissileUntil", -1)
-    //    val dontFireDefensiveMissileUntil = bot.inputAsIntOrElse("dontFireDefensiveMissileUntil", -1)
-    //    val lastDirection = bot.inputAsIntOrElse("lastDirection", 0)
-    //
-    //    // determine movement direction
-    //    directionValue(lastDirection) += 10 // try to break ties by favoring the last direction
-    //    val bestDirection45 = directionValue.zipWithIndex.maxBy(_._1)._2
-    //    val direction = XY.fromDirection45(bestDirection45)
-    //    bot.move(direction)
-    //    bot.set("lastDirection" -> bestDirection45)
-    //
-    //    if (dontFireAggressiveMissileUntil < bot.time && bot.energy > 100) { // fire attack missile?
-    //      nearestEnemyMaster match {
-    //        case None => // no-on nearby
-    //        case Some(relPos) => // a master is nearby
-    //          val unitDelta = relPos.signum
-    //          val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
-    //          bot.spawn(unitDelta, "mood" -> "Aggressive", "target" -> remainder)
-    //          bot.set("dontFireAggressiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
-    //      }
-    //    } else if (dontFireDefensiveMissileUntil < bot.time && bot.energy > 100) { // fire defensive missile?
-    //      nearestEnemySlave match {
-    //        case None => // no-on nearby
-    //        case Some(relPos) => // an enemy slave is nearby
-    //          if (relPos.stepCount < 8) {
-    //            // this one's getting too close!
-    //            val unitDelta = relPos.signum
-    //            val remainder = relPos - unitDelta // we place slave nearer target, so subtract that from overall delta
-    //            bot.spawn(unitDelta, "mood" -> "Defensive", "target" -> remainder)
-    //            bot.set("dontFireDefensiveMissileUntil" -> (bot.time + relPos.stepCount + 1))
-    //          }
-    //      }
-    //    }
+  def getBestDirection(bot: Bot) = {
     var availablePositions = Array(-1, 0, 1)
     //converts (-1, 0, 1) to ((-1, -1), (-1, 0), (-1, 1), (0, -1) ... )
-    /*var availableDirections = availablePositions.foldLeft(List[List[Int]]())((b, a) => b.union(availablePositions.foldLeft(List[List[Int]]())((d, c) =>
-      a match {
-        // omit (0, 0)
-        case 0 =>
-          c match {
-            case 0 => d
-            case _ => d :+ List(a, c)
-          }
-        case _ => d :+ List(a, c)
-      })))*/
     var availableDirections = (List[List[Int]]() /: availablePositions)((b, a) => b.union((List[List[Int]]() /: availablePositions)((d, c) =>
       a match {
         // omit (0, 0)
@@ -95,35 +58,101 @@ object ControlFunction {
     var choices = (List[Choice]() /: availableDirections)((b, a) => b :+ Choice(XY(a(0), a(1))))
     val distances = find(bot.view, Items.wall)
     val distancesZugar = find(bot.view, Items.zugar)
-    val nearestZugar = distancesZugar.min
     val distancesToxifera = find(bot.view, Items.toxifera)
-
+    val distancesFluppets = find(bot.view, Items.fluppet)
+    val distancesSnorgs = find(bot.view, Items.snorg)
+    val distancesMiniBots = find(bot.view, Items.miniBot)
     
-    var allDistances = (distances, distancesZugar, distancesToxifera).zipped.toList
-    for ((choice, index) <- choices.zipWithIndex){
+    for ((choice, index) <- choices.zipWithIndex) {
       choice.closestToxifera = distancesToxifera(index)
       choice.closestWall = distances(index)
       choice.closestZugar = distancesZugar(index)
+      choice.closestFluppet = distancesFluppets(index)
+      choice.closestSnorg = distancesSnorgs(index)
+      choice.closestMiniBot = distancesMiniBots(index)
     }
+    
+    choices
+  }
+
+  def forMaster(bot: Bot) {
+    var choices = getBestDirection(bot)
     var nonDangerousDirections = choices.filter(choice => !choice.dangerous)
-    var movingDirection = Choice(XY(0,0))
-    if (nonDangerousDirections.size > 0){
-      movingDirection = nonDangerousDirections.minBy[Double](x => x.closestZugar)
+    var movingDirection = Choice(XY(0, 0))
+    if (nonDangerousDirections.size > 0) {
+      var movingTowardsClosestFluppet = nonDangerousDirections.minBy[Double](x => x.closestFluppet)
+      var movingDirectionTowardsClosestZugar = nonDangerousDirections.minBy[Double](x => x.closestZugar)
+      if (movingTowardsClosestFluppet.closestFluppet / movingDirectionTowardsClosestZugar.closestZugar < 2.5) {
+        movingDirection = movingTowardsClosestFluppet
+      } else {
+        movingDirection = movingDirectionTowardsClosestZugar
+      }
+      if (movingTowardsClosestFluppet.closestFluppet + movingDirectionTowardsClosestZugar.closestZugar > 1500) {
+        movingDirection = Random.shuffle(nonDangerousDirections).head
+      }
     }
-    //var movingDirection = List[Int](0, 0)
     bot move (movingDirection.direction)
+    //if (countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 1) {
+    bot.status(bot.time.toString)
+    if (bot.time < 100 || countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 2) {
+      bot.spawn(nonDangerousDirections.minBy[Double](x => x.closestZugar).direction)
+    }
+    //}
+  }
+
+  def forSlave(bot: MiniBot) {
+    var choices = getBestDirection(bot)
+    println(choices)
+    var nonDangerousDirections = choices.filter(choice => !choice.betterNotGoHereMiniBot)
+    
+    var movingDirection = Choice(XY(0, 0))
+    if (nonDangerousDirections.size > 0) {
+      var movingTowardsClosestFluppet = nonDangerousDirections.minBy[Double](x => x.closestFluppet)
+      var movingDirectionTowardsClosestZugar = nonDangerousDirections.minBy[Double](x => x.closestZugar)
+      if (movingTowardsClosestFluppet.closestFluppet / movingDirectionTowardsClosestZugar.closestZugar < 2.5) {
+        movingDirection = movingTowardsClosestFluppet
+      } else {
+        movingDirection = movingDirectionTowardsClosestZugar
+      }
+      if (movingTowardsClosestFluppet.closestFluppet + movingDirectionTowardsClosestZugar.closestZugar > 1500) {
+        movingDirection = Choice(bot.offsetToMaster)
+      }
+    }
+    if ((1000 - bot.time) / 10 < bot.offsetToMaster.length) {     
+      movingDirection = Choice(XY.fromDirection45(bot.offsetToMaster.toDirection45))
+      if (nonDangerousDirections.filter(x => x.direction.x == movingDirection.direction.x &&
+          x.direction.y == movingDirection.direction.y).length == 0){
+    	  movingDirection = Random.shuffle(nonDangerousDirections).head
+      } 
+    }
+    bot.move(movingDirection.direction)
+    bot.status(bot.energy.toString)
+    if (countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 2) {
+      bot.spawn(XY(1, 1))
+    }
   }
 
   def find(view: View, item: Char) = {
     var directionValue = Array.fill(8)(1000.0) //1000 is infinity
+    try{
     for ((cell, index) <- view.cells.zipWithIndex) {
       cell match {
         case `item` =>
-          directionValue = updateDirectionValue(view, directionValue, index)
+          if (index != 4){
+        	  directionValue = updateDirectionValue(view, directionValue, index)
+          }
         case default =>
       }
     }
+    }
+    catch{
+      case e : Exception => println(e.getMessage())
+    }
     directionValue
+  }
+
+  def countBeasts(view: View, item: Char) = {
+    view.cells.filter(x => x == item).length()
   }
 
   def updateDirectionValue(view: View, directionValue: Array[Double], index: Int) = {
@@ -147,79 +176,6 @@ object ControlFunction {
       case Direction45.RightUp => 5
       case Direction45.Up => 3
       case Direction45.UpLeft => 0
-    }
-  }
-
-  def forSlave(bot: MiniBot) {
-    bot.inputOrElse("mood", "Lurking") match {
-      case "Aggressive" => reactAsAggressiveMissile(bot)
-      case "Defensive" => reactAsDefensiveMissile(bot)
-      case s: String => bot.log("unknown mood: " + s)
-    }
-  }
-
-  def reactAsAggressiveMissile(bot: MiniBot) {
-    bot.view.offsetToNearest('m') match {
-      case Some(delta: XY) =>
-        // another master is visible at the given relative position (i.e. position delta)
-
-        // close enough to blow it up?
-        if (delta.length <= 2) {
-          // yes -- blow it up!
-          bot.explode(4)
-
-        } else {
-          // no -- move closer!
-          bot.move(delta.signum)
-          bot.set("rx" -> delta.x, "ry" -> delta.y)
-        }
-      case None =>
-        // no target visible -- follow our targeting strategy
-        val target = bot.inputAsXYOrElse("target", XY.Zero)
-
-        // did we arrive at the target?
-        if (target.isNonZero) {
-          // no -- keep going
-          val unitDelta = target.signum // e.g. CellPos(-8,6) => CellPos(-1,1)
-          bot.move(unitDelta)
-
-          // compute the remaining delta and encode it into a new 'target' property
-          val remainder = target - unitDelta // e.g. = CellPos(-7,5)
-          bot.set("target" -> remainder)
-        } else {
-          // yes -- but we did not detonate yet, and are not pursuing anything?!? => switch purpose
-          bot.set("mood" -> "Lurking", "target" -> "")
-          bot.say("Lurking")
-        }
-    }
-  }
-
-  def reactAsDefensiveMissile(bot: MiniBot) {
-    bot.view.offsetToNearest('s') match {
-      case Some(delta: XY) =>
-        // another slave is visible at the given relative position (i.e. position delta)
-        // move closer!
-        bot.move(delta.signum)
-        bot.set("rx" -> delta.x, "ry" -> delta.y)
-
-      case None =>
-        // no target visible -- follow our targeting strategy
-        val target = bot.inputAsXYOrElse("target", XY.Zero)
-
-        // did we arrive at the target?
-        if (target.isNonZero) {
-          // no -- keep going
-          val unitDelta = target.signum // e.g. CellPos(-8,6) => CellPos(-1,1)
-          bot.move(unitDelta)
-
-          // compute the remaining delta and encode it into a new 'target' property
-          val remainder = target - unitDelta // e.g. = CellPos(-7,5)
-          bot.set("target" -> remainder)
-        } else {
-          // yes -- but we did not annihilate yet, and are not pursuing anything?!? => switch purpose
-          bot.set("mood" -> "Lurking", "target" -> "")
-          bot.say("Lurking")
-        }
     }
   }
 
@@ -286,7 +242,6 @@ object ControlFunction {
 class ControlFunctionFactory {
   def create = (input: String) => {
     val (opcode, params) = CommandParser(input)
-    println(opcode)
     opcode match {
       case "React" =>
         val bot = new BotImpl(params)
