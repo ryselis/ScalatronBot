@@ -93,8 +93,7 @@ object ControlFunction {
     }
     bot move (movingDirection.direction)
     //if (countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 1) {
-    bot.status(bot.time.toString)
-    if (bot.time < 100 || countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 2) {
+    if (bot.time < 100 || countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 1) {
       bot.spawn(nonDangerousDirections.minBy[Double](x => x.closestZugar).direction)
     }
     //}
@@ -102,7 +101,7 @@ object ControlFunction {
 
   def forSlave(bot: MiniBot) {
     var choices = getBestDirection(bot)
-    println(choices)
+    
     var nonDangerousDirections = choices.filter(choice => !choice.betterNotGoHereMiniBot)
     
     var movingDirection = Choice(XY(0, 0))
@@ -115,9 +114,10 @@ object ControlFunction {
         movingDirection = movingDirectionTowardsClosestZugar
       }
       if (movingTowardsClosestFluppet.closestFluppet + movingDirectionTowardsClosestZugar.closestZugar > 1500) {
-        movingDirection = Choice(bot.offsetToMaster)
+        movingDirection = Random.shuffle(nonDangerousDirections).head
       }
     }
+    var closestSnorg = choices.minBy[Double](x => x.closestSnorg).closestSnorg
     if ((1000 - bot.time) / 10 < bot.offsetToMaster.length) {     
       movingDirection = Choice(XY.fromDirection45(bot.offsetToMaster.toDirection45))
       if (nonDangerousDirections.filter(x => x.direction.x == movingDirection.direction.x &&
@@ -125,9 +125,11 @@ object ControlFunction {
     	  movingDirection = Random.shuffle(nonDangerousDirections).head
       } 
     }
+    if (closestSnorg < 2){
+      bot.explode((closestSnorg+1).toInt)
+    }
     bot.move(movingDirection.direction)
-    bot.status(bot.energy.toString)
-    if (countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 2) {
+    if (countBeasts(bot.view, Items.zugar) + countBeasts(bot.view, Items.fluppet) > 5) {
       bot.spawn(XY(1, 1))
     }
   }
@@ -146,7 +148,7 @@ object ControlFunction {
     }
     }
     catch{
-      case e : Exception => println(e.getMessage())
+      case e : Exception => 
     }
     directionValue
   }
